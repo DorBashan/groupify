@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - SPOTIFY_REDIRECT_URI=${SPOTIFY_REDIRECT_URI}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - PORT=3001
+      - DB_PATH=/data/groupify.db
+    volumes:
+      - db_data:/data
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db_data:
