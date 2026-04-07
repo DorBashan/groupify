@@ -1,21 +1,20 @@
-import Database from 'better-sqlite3';
-import { fileURLToPath } from 'url';
-import path from 'path';
+import { createClient } from '@libsql/client';
 
-const DB_PATH = process.env.DB_PATH || './groupify.db';
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL || 'file:./groupify.db',
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-db.exec(`
+await db.execute(`
   CREATE TABLE IF NOT EXISTS groups (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     playlist_data TEXT
-  );
+  )
+`);
 
+await db.execute(`
   CREATE TABLE IF NOT EXISTS members (
     id TEXT PRIMARY KEY,
     group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
@@ -28,10 +27,9 @@ db.exec(`
     token_expires_at INTEGER NOT NULL,
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(group_id, spotify_id)
-  );
+  )
 `);
 
-// Migrations — safe to run on every startup
-try { db.exec(`ALTER TABLE members ADD COLUMN country TEXT`); } catch {}
+try { await db.execute(`ALTER TABLE members ADD COLUMN country TEXT`); } catch {}
 
 export default db;
