@@ -23,6 +23,7 @@ export function getAuthUrl(state) {
     scope: scopes,
     redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
     state,
+    show_dialog: 'true',
   });
 
   return `https://accounts.spotify.com/authorize?${params}`;
@@ -68,10 +69,10 @@ async function refreshAccessToken(member) {
   const { access_token, expires_in, refresh_token } = response.data;
   const expiresAt = Date.now() + expires_in * 1000;
 
-  db.prepare(`
-    UPDATE members SET access_token = ?, token_expires_at = ?, refresh_token = COALESCE(?, refresh_token)
-    WHERE id = ?
-  `).run(access_token, expiresAt, refresh_token || null, member.id);
+  await db.execute({
+    sql: `UPDATE members SET access_token = ?, token_expires_at = ?, refresh_token = COALESCE(?, refresh_token) WHERE id = ?`,
+    args: [access_token, expiresAt, refresh_token || null, member.id],
+  });
 
   return access_token;
 }
