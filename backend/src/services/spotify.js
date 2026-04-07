@@ -161,7 +161,7 @@ export async function getPlaylistTracks(member, playlistId) {
 }
 
 export async function getArtistTopTracks(member, artistId) {
-  const data = await spotifyGet(member, `/artists/${artistId}/top-tracks`, { market: 'from_token' });
+  const data = await spotifyGet(member, `/artists/${artistId}/top-tracks`);
   return data.tracks || [];
 }
 
