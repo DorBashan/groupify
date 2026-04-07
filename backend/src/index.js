@@ -5,7 +5,6 @@ import authRouter from './routes/auth.js';
 import groupsRouter from './routes/groups.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -18,6 +17,12 @@ app.use('/api/groups', groupsRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-app.listen(PORT, () => {
-  console.log(`Groupify backend running on http://localhost:${PORT}`);
-});
+// Only start the HTTP server when running locally, not on Vercel
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`Groupify backend running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

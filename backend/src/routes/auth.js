@@ -7,12 +7,12 @@ const router = Router();
 
 // Initiate Spotify OAuth for a group member
 // state encodes: groupId:memberId(new uuid)
-router.get('/login', (req, res) => {
+router.get('/login', async (req, res) => {
   const { groupId } = req.query;
   if (!groupId) return res.status(400).json({ error: 'groupId required' });
 
-  const group = db.prepare('SELECT id FROM groups WHERE id = ?').get(groupId);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
+  const result = await db.execute({ sql: 'SELECT id FROM groups WHERE id = ?', args: [groupId] });
+  if (!result.rows[0]) return res.status(404).json({ error: 'Group not found' });
 
   const memberId = uuidv4();
   const state = `${groupId}:${memberId}`;
@@ -38,8 +38,8 @@ router.get('/callback', async (req, res) => {
     return res.redirect(`${process.env.FRONTEND_URL}/join?error=invalid_state`);
   }
 
-  const group = db.prepare('SELECT id FROM groups WHERE id = ?').get(groupId);
-  if (!group) {
+  const groupResult = await db.execute({ sql: 'SELECT id FROM groups WHERE id = ?', args: [groupId] });
+  if (!groupResult.rows[0]) {
     return res.redirect(`${process.env.FRONTEND_URL}/join?error=group_not_found`);
   }
 
@@ -52,42 +52,46 @@ router.get('/callback', async (req, res) => {
     const country = spotifyUser.country || null;
 
     // Upsert member — if same Spotify user joins again, update their tokens
-    const existing = db
-      .prepare('SELECT id FROM members WHERE group_id = ? AND spotify_id = ?')
-      .get(groupId, spotifyUser.id);
+    const existingResult = await db.execute({
+      sql: 'SELECT id FROM members WHERE group_id = ? AND spotify_id = ?',
+      args: [groupId, spotifyUser.id],
+    });
+    const existing = existingResult.rows[0];
 
     const finalMemberId = existing ? existing.id : memberId;
 
     if (existing) {
-      db.prepare(`
-        UPDATE members SET access_token = ?, refresh_token = ?, token_expires_at = ?,
+      await db.execute({
+        sql: `UPDATE members SET access_token = ?, refresh_token = ?, token_expires_at = ?,
           display_name = ?, avatar_url = ?, country = ?
-        WHERE id = ?
-      `).run(
-        tokens.access_token,
-        tokens.refresh_token,
-        expiresAt,
-        spotifyUser.display_name || spotifyUser.id,
-        avatarUrl,
-        country,
-        existing.id
-      );
+        WHERE id = ?`,
+        args: [
+          tokens.access_token,
+          tokens.refresh_token,
+          expiresAt,
+          spotifyUser.display_name || spotifyUser.id,
+          avatarUrl,
+          country,
+          existing.id,
+        ],
+      });
     } else {
-      db.prepare(`
-        INSERT INTO members (id, group_id, spotify_id, display_name, avatar_url, country,
+      await db.execute({
+        sql: `INSERT INTO members (id, group_id, spotify_id, display_name, avatar_url, country,
           access_token, refresh_token, token_expires_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        memberId,
-        groupId,
-        spotifyUser.id,
-        spotifyUser.display_name || spotifyUser.id,
-        avatarUrl,
-        country,
-        tokens.access_token,
-        tokens.refresh_token,
-        expiresAt
-      );
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          memberId,
+          groupId,
+          spotifyUser.id,
+          spotifyUser.display_name || spotifyUser.id,
+          avatarUrl,
+          country,
+          tokens.access_token,
+          tokens.refresh_token,
+          expiresAt,
+        ],
+      });
     }
 
     res.redirect(
